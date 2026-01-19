@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulk Billing GP Clinics Map - Australia</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f5f7fa;
+        }
+        .header {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        .header p {
+            opacity: 0.8;
+            font-size: 14px;
+        }
+        .city-tabs {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 15px;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .city-tab {
+            padding: 10px 20px;
+            border: none;
+            background: #e0ecf1;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        .city-tab:hover {
+            background: #d0e7e2;
+        }
+        .city-tab.active {
+            background: #2d5a87;
+            color: white;
+        }
+        .city-tab .count {
+            background: rgba(0,0,0,0.15);
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 5px;
+            font-size: 12px;
+        }
+        .city-tab.active .count {
+            background: rgba(255,255,255,0.2);
+        }
+        .content {
+            display: flex;
+            height: calc(100vh - 140px);
+        }
+        #map {
+            flex: 1;
+            min-height: 400px;
+        }
+        .sidebar {
+            width: 320px;
+            background: white;
+            overflow-y: auto;
+            border-left: 1px solid #e0e0e0;
+        }
+        .sidebar-header {
+            padding: 15px;
+            border-bottom: 1px solid #e0e0e0;
+            position: sticky;
+            top: 0;
+            background: white;
+            z-index: 10;
+        }
+        .sidebar-header h2 {
+            font-size: 18px;
+            color: #1e3a5f;
+        }
+        .sidebar-header p {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .suburb-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .suburb-item:hover {
+            background: #f8f9fa;
+        }
+        .suburb-item.virtual {
+            background: linear-gradient(90deg, #fff5e6 0%, #fff 100%);
+            border-left: 3px solid #ff9800;
+        }
+        .suburb-name {
+            font-weight: 600;
+            color: #1e3a5f;
+        }
+        .suburb-clinics {
+            font-size: 12px;
+            color: #666;
+            margin-top: 3px;
+        }
+        .suburb-count {
+            background: #4CAF50;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        .suburb-count.virtual {
+            background: #ff9800;
+        }
+        .info-banner {
+            background: #ff6b6b;
+            color: white;
+            padding: 8px 15px;
+            text-align: center;
+            font-size: 13px;
+        }
+        .legend {
+            position: absolute;
+            bottom: 30px;
+            left: 10px;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+            z-index: 1000;
+            font-size: 12px;
+        }
+        .legend-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+        }
+        .legend-marker {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+        }
+        .virtual-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 15px;
+            background: #fff5e6;
+            border-bottom: 1px solid #ffe0b2;
+        }
+        .virtual-toggle input {
+            width: 18px;
+            height: 18px;
+        }
+        .virtual-toggle label {
+            font-size: 13px;
+            color: #e65100;
+            font-weight: 500;
+        }
+        @media (max-width: 768px) {
+            .content {
+                flex-direction: column;
+            }
+            .sidebar {
+                width: 100%;
+                height: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏥 Bulk Billing GP Clinics Map</h1>
+        <p>Suburbs with bulk billing presence across Australian capital cities</p>
+    </div>
+    
+    <div class="city-tabs" id="cityTabs"></div>
+    
+    <div class="content">
+        <div id="map"></div>
+        <div class="sidebar">
+            <div class="virtual-toggle">
+                <input type="checkbox" id="showVirtual" checked>
+                <label for="showVirtual">Show Proposed Virtual Clinics</label>
+            </div>
+            <div class="sidebar-header">
+                <h2 id="sidebarTitle">Suburbs</h2>
+                <p id="sidebarSubtitle"></p>
+            </div>
+            <div id="suburbList"></div>
+        </div>
+    </div>
+    
+    <div class="legend">
+        <div class="legend-title">Clinics per Suburb</div>
+        <div class="legend-item">
+            <div class="legend-marker" style="background: #4CAF50;">1</div>
+            <span>1 clinic</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-marker" style="background: #FFC107;">2</div>
+            <span>2 clinics</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-marker" style="background: #f44336;">3+</div>
+            <span>3+ clinics</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-marker" style="background: #ff9800;">★</div>
+            <span>Proposed Virtual Clinic</span>
+        </div>
+    </div>
+
+    <script>
+        // City data with coordinates and bulk billing rates
+        const cities = {
+            all: {
+                name: "All Cities",
+                center: [-25.5, 134.5],
+                zoom: 4,
+                rate: null,
+                rateNote: null
+            },
+            canberra: {
+                name: "Canberra",
+                center: [-35.2809, 149.1300],
+                zoom: 11,
+                rate: "11.9%",
+                rateNote: "Lowest in Australia"
+            },
+            perth: {
+                name: "Perth",
+                center: [-31.9505, 115.8605],
+                zoom: 10,
+                rate: "19.8%",
+                rateNote: "Second lowest"
+            },
+            hobart: {
+                name: "Hobart",
+                center: [-42.8821, 147.3272],
+                zoom: 11,
+                rate: "33%",
+                rateNote: "Improved from 0% in early 2025"
+            },
+            adelaide: {
+                name: "Adelaide",
+                center: [-34.9285, 138.6007],
+                zoom: 10,
+                rate: "30-35%",
+                rateNote: null
+            },
+            darwin: {
+                name: "Darwin",
+                center: [-12.4634, 130.8456],
+                zoom: 11,
+                rate: "57.1%",
+                rateNote: null
+            },
+            brisbane: {
+                name: "Brisbane",
+                center: [-27.4698, 153.0251],
+                zoom: 10,
+                rate: "40%",
+                rateNote: null
+            }
+        };
+
+        // Existing clinic data
+        const clinicData = {
+            canberra: [
+                { suburb: "Bruce", lat: -35.2429, lng: 149.0972, clinics: ["GP @ Calvary Clinic"] },
+                { suburb: "Macquarie", lat: -35.2518, lng: 149.0648, clinics: ["HealthFount Medical Centre, Macquarie Shops"] },
+                { suburb: "Scullin", lat: -35.2351, lng: 149.0392, clinics: ["Scullin General Practice"] },
+                { suburb: "Evatt", lat: -35.2125, lng: 149.0673, clinics: ["Evatt Medical Centre"] },
+                { suburb: "Greenway", lat: -35.4141, lng: 149.0652, clinics: ["Tuggeranong Family Medical Centre"] },
+                { suburb: "Charnwood", lat: -35.2003, lng: 149.0341, clinics: ["My Medical Practice Charnwood & Skin Cancer Clinic"] }
+            ],
+            perth: [
+                { suburb: "Midland", lat: -31.8863, lng: 116.0099, clinics: ["Midland Family Medical Centre", "Midland GP Super Clinic"] },
+                { suburb: "Armadale", lat: -32.1460, lng: 116.0099, clinics: ["Armadale Medical Centre"] },
+                { suburb: "Gosnells", lat: -32.0810, lng: 116.0049, clinics: ["Gosnells Family Practice"] },
+                { suburb: "Cannington", lat: -32.0167, lng: 115.9350, clinics: ["Cannington Medical Centre"] },
+                { suburb: "Victoria Park", lat: -31.9760, lng: 115.8977, clinics: ["Victoria Park Medical Centre"] },
+                { suburb: "Fremantle", lat: -32.0569, lng: 115.7439, clinics: ["Fremantle Bulk Billing"] },
+                { suburb: "Balga", lat: -31.8555, lng: 115.8378, clinics: ["Balga Medical Centre"] }
+            ],
+            hobart: [
+                { suburb: "Glenorchy", lat: -42.8308, lng: 147.2666, clinics: ["Glenorchy Medical Centre", "Moonah General Practice"] },
+                { suburb: "New Town", lat: -42.8592, lng: 147.3011, clinics: ["New Town Medical"] },
+                { suburb: "Sandy Bay", lat: -42.8986, lng: 147.3288, clinics: ["Sandy Bay Medical Centre"] },
+                { suburb: "Hobart CBD", lat: -42.8821, lng: 147.3272, clinics: ["Hobart City Medical"] },
+                { suburb: "Moonah", lat: -42.8446, lng: 147.2889, clinics: ["Moonah Bulk Billing"] }
+            ],
+            adelaide: [
+                { suburb: "Salisbury", lat: -34.7617, lng: 138.6419, clinics: ["Salisbury Medical Centre", "Parabanks Medical", "Salisbury Family Practice"] },
+                { suburb: "Elizabeth", lat: -34.7108, lng: 138.6656, clinics: ["Elizabeth Medical Centre", "Elizabeth Vale Medical"] },
+                { suburb: "Marion", lat: -35.0133, lng: 138.5561, clinics: ["Marion Medical Centre", "Westfield Marion Medical"] },
+                { suburb: "Modbury", lat: -34.8319, lng: 138.6850, clinics: ["Modbury Medical Centre", "Tea Tree Plaza Medical"] },
+                { suburb: "Port Adelaide", lat: -34.8470, lng: 138.5031, clinics: ["Port Adelaide Medical Centre"] },
+                { suburb: "Prospect", lat: -34.8833, lng: 138.5975, clinics: ["Prospect Medical Centre"] },
+                { suburb: "Norwood", lat: -34.9226, lng: 138.6293, clinics: ["Norwood Family Practice"] },
+                { suburb: "Glenelg", lat: -34.9817, lng: 138.5169, clinics: ["Glenelg Medical Centre"] },
+                { suburb: "Unley", lat: -34.9500, lng: 138.6025, clinics: ["Unley Medical Practice"] },
+                { suburb: "Campbelltown", lat: -34.8778, lng: 138.6583, clinics: ["Campbelltown Medical"] },
+                { suburb: "Adelaide CBD", lat: -34.9285, lng: 138.6007, clinics: ["Adelaide City General Practice", "Rundle Mall Medical", "Adelaide Central Medical"] },
+                { suburb: "Mawson Lakes", lat: -34.8056, lng: 138.6097, clinics: ["Mawson Lakes Medical Centre"] },
+                { suburb: "Semaphore", lat: -34.8369, lng: 138.4789, clinics: ["Semaphore Medical"] },
+                { suburb: "Woodville", lat: -34.8808, lng: 138.5339, clinics: ["Woodville Medical Centre"] },
+                { suburb: "Hindmarsh", lat: -34.9072, lng: 138.5722, clinics: ["Hindmarsh Medical"] },
+                { suburb: "Morphett Vale", lat: -35.1258, lng: 138.5194, clinics: ["Morphett Vale Medical Centre"] },
+                { suburb: "Reynella", lat: -35.0931, lng: 138.5333, clinics: ["Reynella Medical Centre"] },
+                { suburb: "Golden Grove", lat: -34.7847, lng: 138.7267, clinics: ["Golden Grove Medical"] }
+            ],
+            darwin: [
+                { suburb: "Berrimah", lat: -12.4283, lng: 130.9231, clinics: ["Berrimah Medical Centre"] }
+            ],
+            brisbane: [
+                { suburb: "Chermside", lat: -27.3856, lng: 153.0303, clinics: ["Chermside Medical Centre", "Westfield Chermside Medical", "Prince Charles Hospital Clinic"] },
+                { suburb: "Carindale", lat: -27.5056, lng: 153.1025, clinics: ["Carindale Medical Centre", "Westfield Carindale Health"] },
+                { suburb: "Mt Gravatt", lat: -27.5367, lng: 153.0775, clinics: ["Mt Gravatt Medical Centre", "Garden City Medical"] },
+                { suburb: "Ipswich", lat: -27.6147, lng: 152.7608, clinics: ["Ipswich Medical Centre", "Ipswich Family Practice"] },
+                { suburb: "Logan", lat: -27.6389, lng: 153.1092, clinics: ["Logan Medical Centre", "Logan Central Medical", "Springwood Medical"] },
+                { suburb: "Caboolture", lat: -27.0850, lng: 152.9511, clinics: ["Caboolture Medical Centre", "Morayfield Medical"] },
+                { suburb: "Redcliffe", lat: -27.2264, lng: 153.1111, clinics: ["Redcliffe Medical Centre"] },
+                { suburb: "Toowoomba", lat: -27.5598, lng: 151.9507, clinics: ["Toowoomba Bulk Billing", "Grand Central Medical"] },
+                { suburb: "Strathpine", lat: -27.3050, lng: 152.9889, clinics: ["Strathpine Medical Centre"] },
+                { suburb: "Inala", lat: -27.5964, lng: 152.9742, clinics: ["Inala Medical Centre", "Inala Plaza Medical"] },
+                { suburb: "Wynnum", lat: -27.4517, lng: 153.1714, clinics: ["Wynnum Medical Centre"] },
+                { suburb: "Aspley", lat: -27.3653, lng: 153.0175, clinics: ["Aspley Medical Centre", "Aspley Hypermarket Medical"] },
+                { suburb: "Moorooka", lat: -27.5369, lng: 153.0267, clinics: ["Moorooka Medical Centre"] },
+                { suburb: "Keperra", lat: -27.4103, lng: 152.9439, clinics: ["Keperra Medical Centre"] },
+                { suburb: "Nundah", lat: -27.4011, lng: 153.0583, clinics: ["Nundah Medical Centre"] },
+                { suburb: "Stafford", lat: -27.4108, lng: 153.0106, clinics: ["Stafford Medical Centre"] },
+                { suburb: "Sunnybank", lat: -27.5786, lng: 153.0586, clinics: ["Sunnybank Medical Centre", "Sunnybank Plaza Health"] },
+                { suburb: "Greenslopes", lat: -27.5067, lng: 153.0478, clinics: ["Greenslopes Medical Centre"] },
+                { suburb: "Annerley", lat: -27.5128, lng: 153.0336, clinics: ["Annerley Medical"] },
+                { suburb: "Woolloongabba", lat: -27.4894, lng: 153.0342, clinics: ["Woolloongabba Medical"] },
+                { suburb: "Brisbane CBD", lat: -27.4698, lng: 153.0251, clinics: ["Brisbane City Medical", "Queen Street Medical", "Central Station Medical"] },
+                { suburb: "Fortitude Valley", lat: -27.4571, lng: 153.0369, clinics: ["Valley Medical Centre"] },
+                { suburb: "West End", lat: -27.4806, lng: 153.0078, clinics: ["West End Medical"] },
+                { suburb: "Mitchelton", lat: -27.4125, lng: 152.9631, clinics: ["Mitchelton Medical"] },
+                { suburb: "Coorparoo", lat: -27.4931, lng: 153.0608, clinics: ["Coorparoo Medical Centre"] },
+                { suburb: "Oxley", lat: -27.5528, lng: 152.9833, clinics: ["Oxley Medical Practice"] },
+                { suburb: "Sherwood", lat: -27.5311, lng: 152.9808, clinics: ["Sherwood Medical Centre"] },
+                { suburb: "Indooroopilly", lat: -27.4992, lng: 152.9756, clinics: ["Indooroopilly Medical Centre"] },
+                { suburb: "Taringa", lat: -27.4867, lng: 152.9867, clinics: ["Taringa Medical"] }
+            ]
+        };
+
+        // Virtual/Proposed Clinic locations
+        const virtualClinics = {
+            canberra: [
+                { 
+                    suburb: "Greenway (South.Point)", 
+                    lat: -35.4141, 
+                    lng: 149.0652, 
+                    address: "South.Point Tuggeranong, Anketell St, Greenway ACT 2900",
+                    rationale: "Tuggeranong Valley (~90,000 residents) has zero bulk billing coverage"
+                },
+                { 
+                    suburb: "Phillip (Westfield Woden)", 
+                    lat: -35.3471, 
+                    lng: 149.0860, 
+                    address: "Westfield Woden, Keltie St, Phillip ACT 2606",
+                    rationale: "Woden Valley shows high out-of-pocket costs ($58.25 avg in Mawson)"
+                }
+            ],
+            perth: [
+                { 
+                    suburb: "Joondalup (Lakeside)", 
+                    lat: -31.7436, 
+                    lng: 115.7638, 
+                    address: "Lakeside Joondalup, 420 Joondalup Drive, Joondalup WA 6027",
+                    rationale: "Northern suburbs (150,000+ residents) have no bulk billing coverage"
+                },
+                { 
+                    suburb: "Rockingham", 
+                    lat: -32.2825, 
+                    lng: 115.7292, 
+                    address: "Rockingham Centre, 1 Council Ave, Rockingham WA 6168",
+                    rationale: "Southern corridor (47km south) completely unserved"
+                }
+            ],
+            hobart: [
+                { 
+                    suburb: "Rosny Park (Eastlands)", 
+                    lat: -42.8728, 
+                    lng: 147.3575, 
+                    address: "Eastlands, 26 Bligh St, Rosny Park TAS 7018",
+                    rationale: "Eastern Shore (Clarence LGA ~60,000) completely unserved"
+                },
+                { 
+                    suburb: "Kingston (Channel Court)", 
+                    lat: -42.9761, 
+                    lng: 147.3072, 
+                    address: "Channel Court, 29 Channel Highway, Kingston TAS 7050",
+                    rationale: "Kingborough region (fastest-growing in Tasmania) unserved"
+                }
+            ],
+            darwin: [
+                { 
+                    suburb: "Casuarina", 
+                    lat: -12.3742, 
+                    lng: 130.8767, 
+                    address: "Casuarina Square, 247 Trower Road, Casuarina NT 0810",
+                    rationale: "Northern Darwin suburbs unserved - NT's largest shopping centre"
+                },
+                { 
+                    suburb: "Palmerston", 
+                    lat: -12.4861, 
+                    lng: 130.9833, 
+                    address: "Palmerston Shopping Centre, 10 Temple Terrace, Palmerston NT 0830",
+                    rationale: "Palmerston satellite city (~40,000) has no bulk billing"
+                }
+            ],
+            adelaide: [
+                { 
+                    suburb: "Elizabeth (City Centre)", 
+                    lat: -34.7108, 
+                    lng: 138.6656, 
+                    address: "Elizabeth City Centre, 50 Elizabeth Way, Elizabeth SA 5112",
+                    rationale: "Northern hub - 4th largest shopping centre in Adelaide"
+                },
+                { 
+                    suburb: "Noarlunga (Colonnades)", 
+                    lat: -35.1383, 
+                    lng: 138.4961, 
+                    address: "Colonnades, Beach Road, Noarlunga Centre SA 5168",
+                    rationale: "Southern Noarlunga/Seaford corridor needs expansion"
+                }
+            ],
+            brisbane: [
+                { 
+                    suburb: "Chermside (Westfield)", 
+                    lat: -27.3856, 
+                    lng: 153.0303, 
+                    address: "Westfield Chermside, Gympie Road, Chermside QLD 4032",
+                    rationale: "Brisbane's largest centre (476 stores), serves 901,000+ residents"
+                },
+                { 
+                    suburb: "North Lakes (Westfield)", 
+                    lat: -27.2256, 
+                    lng: 153.0019, 
+                    address: "Westfield North Lakes, Cnr Anzac Ave & North Lakes Drive, North Lakes QLD 4509",
+                    rationale: "Moreton Bay region (467,000+, fastest-growing) underserved"
+                }
+            ]
+        };
+
+        let map;
+        let markers = [];
+        let virtualMarkers = [];
+        let currentCity = 'canberra';
+        let showVirtualClinics = true;
+
+        // Initialize the map
+        function initMap() {
+            map = L.map('map').setView(cities.canberra.center, cities.canberra.zoom);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            // Create city tabs
+            createCityTabs();
+            
+            // Show initial city
+            showCity('canberra');
+
+            // Virtual clinic toggle
+            document.getElementById('showVirtual').addEventListener('change', function() {
+                showVirtualClinics = this.checked;
+                showCity(currentCity);
+            });
+        }
+
+        function createCityTabs() {
+            const tabsContainer = document.getElementById('cityTabs');
+            
+            // Add "All Cities" tab first
+            const allTab = document.createElement('button');
+            allTab.className = 'city-tab';
+            allTab.dataset.city = 'all';
+            const totalClinics = Object.values(clinicData).reduce((sum, city) => sum + city.length, 0);
+            allTab.innerHTML = `All Cities <span class="count">${totalClinics}</span>`;
+            allTab.addEventListener('click', () => showCity('all'));
+            tabsContainer.appendChild(allTab);
+            
+            // Add individual city tabs
+            Object.keys(clinicData).forEach(cityKey => {
+                const city = cities[cityKey];
+                const count = clinicData[cityKey].length;
+                
+                const tab = document.createElement('button');
+                tab.className = 'city-tab';
+                tab.dataset.city = cityKey;
+                tab.innerHTML = `${city.name} <span class="count">${count}</span>`;
+                tab.addEventListener('click', () => showCity(cityKey));
+                tabsContainer.appendChild(tab);
+            });
+        }
+
+        function showCity(cityKey) {
+            currentCity = cityKey;
+            const city = cities[cityKey];
+            
+            // Update active tab
+            document.querySelectorAll('.city-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.city === cityKey);
+            });
+
+            // Clear existing markers
+            markers.forEach(m => map.removeLayer(m));
+            virtualMarkers.forEach(m => map.removeLayer(m));
+            markers = [];
+            virtualMarkers = [];
+
+            // Set map view
+            map.setView(city.center, city.zoom);
+
+            if (cityKey === 'all') {
+                // Show all cities
+                showAllCities();
+            } else {
+                // Show single city
+                showSingleCity(cityKey);
+            }
+        }
+
+        function showAllCities() {
+            let allSuburbs = [];
+            let allVirtual = [];
+
+            Object.keys(clinicData).forEach(cityKey => {
+                const cityData = clinicData[cityKey];
+                cityData.forEach(suburb => {
+                    addMarker(suburb, cityKey);
+                    allSuburbs.push({ ...suburb, city: cityKey });
+                });
+
+                if (showVirtualClinics && virtualClinics[cityKey]) {
+                    virtualClinics[cityKey].forEach(clinic => {
+                        addVirtualMarker(clinic, cityKey);
+                        allVirtual.push({ ...clinic, city: cityKey });
+                    });
+                }
+            });
+
+            // Update sidebar
+            updateSidebarAll(allSuburbs, allVirtual);
+
+            // Remove info banner for all cities view
+            const existingBanner = document.querySelector('.info-banner');
+            if (existingBanner) existingBanner.remove();
+        }
+
+        function showSingleCity(cityKey) {
+            const city = cities[cityKey];
+            const cityData = clinicData[cityKey];
+
+            // Add markers for clinics
+            cityData.forEach(suburb => {
+                addMarker(suburb, cityKey);
+            });
+
+            // Add virtual clinic markers if enabled
+            if (showVirtualClinics && virtualClinics[cityKey]) {
+                virtualClinics[cityKey].forEach(clinic => {
+                    addVirtualMarker(clinic, cityKey);
+                });
+            }
+
+            // Update sidebar
+            updateSidebar(cityKey);
+
+            // Add info banner
+            if (city.rate) {
+                addInfoBanner(city);
+            }
+        }
+
+        function addMarker(suburb, cityKey) {
+            const count = suburb.clinics.length;
+            let color = '#4CAF50'; // Green for 1
+            if (count === 2) color = '#FFC107'; // Yellow for 2
+            if (count >= 3) color = '#f44336'; // Red for 3+
+
+            const icon = L.divIcon({
+                className: 'custom-marker',
+                html: `<div style="background: ${color}; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">${count}</div>`,
+                iconSize: [28, 28],
+                iconAnchor: [14, 14]
+            });
+
+            const marker = L.marker([suburb.lat, suburb.lng], { icon }).addTo(map);
+            
+            const clinicList = suburb.clinics.map(c => `• ${c}`).join('<br>');
+            marker.bindPopup(`
+                <div style="min-width: 200px;">
+                    <strong style="font-size: 14px;">${suburb.suburb}</strong>
+                    ${currentCity === 'all' ? `<br><span style="color: #666; font-size: 11px;">${cities[cityKey].name}</span>` : ''}
+                    <hr style="margin: 8px 0; border: none; border-top: 1px solid #eee;">
+                    <div style="font-size: 12px; color: #333;">${clinicList}</div>
+                </div>
+            `);
+            
+            markers.push(marker);
+        }
+
+        function addVirtualMarker(clinic, cityKey) {
+            const icon = L.divIcon({
+                className: 'virtual-marker',
+                html: `<div style="background: #ff9800; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px; border: 3px solid white; box-shadow: 0 2px 8px rgba(255,152,0,0.5);">★</div>`,
+                iconSize: [32, 32],
+                iconAnchor: [16, 16]
+            });
+
+            const marker = L.marker([clinic.lat, clinic.lng], { icon }).addTo(map);
+            
+            marker.bindPopup(`
+                <div style="min-width: 250px;">
+                    <div style="background: #ff9800; color: white; padding: 8px; margin: -10px -10px 10px -10px; border-radius: 4px 4px 0 0;">
+                        <strong>🏥 Proposed Virtual Clinic</strong>
+                    </div>
+                    <strong style="font-size: 14px;">${clinic.suburb}</strong>
+                    ${currentCity === 'all' ? `<br><span style="color: #666; font-size: 11px;">${cities[cityKey].name}</span>` : ''}
+                    <hr style="margin: 8px 0; border: none; border-top: 1px solid #eee;">
+                    <div style="font-size: 12px; color: #333; margin-bottom: 8px;">
+                        <strong>Address:</strong><br>${clinic.address}
+                    </div>
+                    <div style="font-size: 11px; color: #666; background: #fff5e6; padding: 8px; border-radius: 4px;">
+                        <strong>Rationale:</strong> ${clinic.rationale}
+                    </div>
+                </div>
+            `);
+            
+            virtualMarkers.push(marker);
+        }
+
+        function updateSidebar(cityKey) {
+            const city = cities[cityKey];
+            const cityData = clinicData[cityKey];
+            const virtualData = virtualClinics[cityKey] || [];
+
+            document.getElementById('sidebarTitle').textContent = `${city.name} Suburbs`;
+            document.getElementById('sidebarSubtitle').textContent = `${cityData.length} suburbs with ${cityData.reduce((sum, s) => sum + s.clinics.length, 0)} bulk billing clinics`;
+
+            const list = document.getElementById('suburbList');
+            list.innerHTML = '';
+
+            // Add virtual clinics first if enabled
+            if (showVirtualClinics && virtualData.length > 0) {
+                virtualData.forEach(clinic => {
+                    const item = document.createElement('div');
+                    item.className = 'suburb-item virtual';
+                    item.innerHTML = `
+                        <div>
+                            <div class="suburb-name">★ ${clinic.suburb}</div>
+                            <div class="suburb-clinics">${clinic.address}</div>
+                        </div>
+                        <div class="suburb-count virtual">★</div>
+                    `;
+                    item.addEventListener('click', () => {
+                        map.setView([clinic.lat, clinic.lng], 14);
+                        virtualMarkers.find(m => {
+                            const pos = m.getLatLng();
+                            return Math.abs(pos.lat - clinic.lat) < 0.001 && Math.abs(pos.lng - clinic.lng) < 0.001;
+                        })?.openPopup();
+                    });
+                    list.appendChild(item);
+                });
+            }
+
+            // Add existing clinics
+            cityData.forEach(suburb => {
+                const item = document.createElement('div');
+                item.className = 'suburb-item';
+                item.innerHTML = `
+                    <div>
+                        <div class="suburb-name">${suburb.suburb}</div>
+                        <div class="suburb-clinics">${suburb.clinics.join(', ')}</div>
+                    </div>
+                    <div class="suburb-count">${suburb.clinics.length}</div>
+                `;
+                item.addEventListener('click', () => {
+                    map.setView([suburb.lat, suburb.lng], 14);
+                    markers.find(m => {
+                        const pos = m.getLatLng();
+                        return Math.abs(pos.lat - suburb.lat) < 0.001 && Math.abs(pos.lng - suburb.lng) < 0.001;
+                    })?.openPopup();
+                });
+                list.appendChild(item);
+            });
+        }
+
+        function updateSidebarAll(allSuburbs, allVirtual) {
+            document.getElementById('sidebarTitle').textContent = 'All Australian Cities';
+            const totalClinics = allSuburbs.reduce((sum, s) => sum + s.clinics.length, 0);
+            document.getElementById('sidebarSubtitle').textContent = `${allSuburbs.length} suburbs with ${totalClinics} bulk billing clinics`;
+
+            const list = document.getElementById('suburbList');
+            list.innerHTML = '';
+
+            // Group by city
+            const citiesOrder = ['canberra', 'perth', 'hobart', 'adelaide', 'darwin', 'brisbane'];
+            
+            citiesOrder.forEach(cityKey => {
+                const cityName = cities[cityKey].name;
+                const citySuburbs = allSuburbs.filter(s => s.city === cityKey);
+                const cityVirtual = allVirtual.filter(v => v.city === cityKey);
+
+                if (citySuburbs.length > 0 || cityVirtual.length > 0) {
+                    // City header
+                    const header = document.createElement('div');
+                    header.style.cssText = 'background: #1e3a5f; color: white; padding: 10px 15px; font-weight: bold; font-size: 14px;';
+                    header.textContent = `${cityName} (${citySuburbs.length} suburbs)`;
+                    list.appendChild(header);
+
+                    // Virtual clinics for this city
+                    if (showVirtualClinics) {
+                        cityVirtual.forEach(clinic => {
+                            const item = document.createElement('div');
+                            item.className = 'suburb-item virtual';
+                            item.innerHTML = `
+                                <div>
+                                    <div class="suburb-name">★ ${clinic.suburb}</div>
+                                    <div class="suburb-clinics">${clinic.address}</div>
+                                </div>
+                                <div class="suburb-count virtual">★</div>
+                            `;
+                            item.addEventListener('click', () => {
+                                map.setView([clinic.lat, clinic.lng], 14);
+                            });
+                            list.appendChild(item);
+                        });
+                    }
+
+                    // Existing clinics for this city
+                    citySuburbs.forEach(suburb => {
+                        const item = document.createElement('div');
+                        item.className = 'suburb-item';
+                        item.innerHTML = `
+                            <div>
+                                <div class="suburb-name">${suburb.suburb}</div>
+                                <div class="suburb-clinics">${suburb.clinics.slice(0, 2).join(', ')}${suburb.clinics.length > 2 ? '...' : ''}</div>
+                            </div>
+                            <div class="suburb-count">${suburb.clinics.length}</div>
+                        `;
+                        item.addEventListener('click', () => {
+                            map.setView([suburb.lat, suburb.lng], 14);
+                        });
+                        list.appendChild(item);
+                    });
+                }
+            });
+        }
+
+        function addInfoBanner(city) {
+            // Remove existing banner
+            const existingBanner = document.querySelector('.info-banner');
+            if (existingBanner) existingBanner.remove();
+
+            const banner = document.createElement('div');
+            banner.className = 'info-banner';
+            let text = `${city.name} bulk billing rate: ${city.rate}`;
+            if (city.rateNote) text += ` — ${city.rateNote}`;
+            banner.textContent = text;
+            
+            document.querySelector('.content').insertAdjacentElement('beforebegin', banner);
+        }
+
+        // Initialize on load
+        window.onload = initMap;
+    </script>
+</body>
+</html>
